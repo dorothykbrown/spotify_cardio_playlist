@@ -7,6 +7,8 @@ import base64
 from urllib.parse import urlencode
 import json
 
+from spotify_app.models import Playlist
+
 # Request authorization
 # Create a Playlist; Store it's id
 # Allow user to choose what level of cardio exercise they would like and what amount of time they would like to exercise for
@@ -15,6 +17,9 @@ import json
 # maintain desired BPM until 5 min before end of session then decrease BPM for cooldown (can use BPM 1/2 difference between desired BPM and resting BPM)
 # If BPM difference between sequential songs is greater than 15, get songs similar to those already in list to fill gaps
 # Add songs to playlist
+
+# New Strategy
+# Find bpms for all songs from user's playlists, create Song instances in DB; search from songs in DB to create playlists
 
 
 class MyCardioBeats:
@@ -86,9 +91,11 @@ class MyCardioBeats:
             "c": "cardio",
             "p": "peak"
         }
+
+        playlist_name = f"My Cardio Beats - {intensity_dict.get(self.intensity, '')} - {date.today()}"
         data = json.dumps(
             {
-                "name": f"My Cardio Beats - {intensity_dict.get(self.intensity, '')} - {date.today()}",
+                "name": playlist_name,
                 "description": "My Cardio Exercise Playlist",
                 "public": False
             }
@@ -110,8 +117,13 @@ class MyCardioBeats:
             raise ResponseException(response.status_code)
 
         response_json = response.json()
+        playlist_id = response_json["id"]
+        Playlist.objects.create(
+            id=playlist_id,
+            name=playlist_name,
+        )
 
-        return response_json["id"]
+        return playlist_id
 
     def get_user_preferences(self) -> Tuple[str, int]:
         """

@@ -1,0 +1,9 @@
+{% if all_playlists %}
+    <ul>
+        {% for playlist in all_playlists %}
+            <li><a href="/spotify_app/">{{playlist.name}}<a></li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No playlists are available.</p>
+{% endif %}
