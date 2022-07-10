@@ -1,8 +1,7 @@
 import requests
 from urllib.parse import urlencode
-import webbrowser
 from datetime import date
-from secrets import client_id, client_secret, oauth_token, user_id, scopes, redirect_uri
+from secrets import client_id, client_secret, user_id, redirect_uri
 from typing import Optional, Tuple
 from exceptions import ResponseException
 import base64
@@ -12,6 +11,8 @@ import random
 import re
 from datetime import datetime, timedelta
 
+from spotify_app.models import Playlist
+
 # Request authorization
 # Create a Playlist; Store it's id
 # Allow user to choose what level of cardio exercise they would like and what amount of time they would like to exercise for
@@ -20,6 +21,7 @@ from datetime import datetime, timedelta
 # maintain desired BPM until 5 min before end of session then decrease BPM for cooldown (can use BPM 1/2 difference between desired BPM and resting BPM)
 # If BPM difference between sequential songs is greater than 15, get songs similar to those already in list to fill gaps
 # Add songs to playlist
+
 
 cardio_playlists_ids = {
     "pop": "37i9dQZF1DWSJHnPb1f0X3",
@@ -242,8 +244,13 @@ class MyCardioBeats:
             raise ResponseException(response.status_code)
 
         response_json = response.json()
+        playlist_id = response_json["id"]
+        Playlist.objects.create(
+            id=playlist_id,
+            name=playlist_name,
+        )
 
-        return response_json["id"]
+        return playlist_id
 
     def get_user_preferences(self) -> Tuple[str, int]:
         """
