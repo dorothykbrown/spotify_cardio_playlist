@@ -1,17 +1,19 @@
-import requests
-from urllib.parse import urlencode
-from datetime import date
-from secrets import client_id, client_secret, user_id, redirect_uri
-from typing import Optional, Tuple
-from exceptions import ResponseException
 import base64
-from urllib.parse import urlencode
 import json
 import random
 import re
-from datetime import datetime, timedelta
+import requests
+import spotipy
+import spotipy.util as util
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
-from spotify_app.models import Playlist
+from datetime import date, datetime, timedelta
+from exceptions import ResponseException
+from secrets import client_id, client_secret, user_id, redirect_uri, scopes
+from typing import Optional, Tuple
+from urllib.parse import urlencode
+
+# from spotify_app.models import Playlist
 
 # Request authorization
 # Create a Playlist; Store it's id
@@ -38,6 +40,39 @@ cardio_playlists_ids = {
     "trap": "37i9dQZF1DWZqUHC2tviPw",
     "morning": "37i9dQZF1DX8E1Op3UZWf0",
     "90s": "37i9dQZF1DXdMm3yYbD7IO",
+    "dancehall": "3Vp3kcErFpuo5i2EZoHFB4",
+    "soca": "5lQqaJsg4X6VrMsI0e7tuy",
+    "afrobeat": "7MSWTrjufCCftrBNFxaVo3"
+}
+
+genre_dict = {
+    "pop": "pop",
+    "p": "pop",
+    "trap": "trap",
+    "t": "trap",
+    "90s": "90s",
+    "retro": "retro",
+    "re": "retro",
+    "latin": "latin",
+    "l": "latin",
+    "funk": "funk",
+    "f": "funk",
+    "rock": "rock",
+    "ro": "rock",
+    "hip_hop": "hip hop",
+    "hh": "hip hop",
+    "soul": "soul",
+    "s": "soul",
+    "dance": "dance",
+    "d": "dance",
+    "morning": "morning",
+    "m": "morning",
+    "da": "dancehall",
+    "dancehall": "dancehall",
+    "a": "afrobeat",
+    "afrobeat": "afrobeat",
+    "so": "soca",
+    "soca": "soca",
 }
 
 
@@ -92,6 +127,15 @@ class MyCardioBeats:
         self.user_id = user_id
         self.client_id = client_id
         self.token = None
+        self.spotify_client = spotipy.Spotify(
+            auth_manager=SpotifyOAuth(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                scope=scopes,
+                open_browser=True
+            )
+        )
         self.cardio_bpm_dict = {  # mapping of desired heart rate zones to corresponding min and max BPMs
             "fat_burn": (120, 141),
             "cardio": (142, 168),
@@ -107,10 +151,10 @@ class MyCardioBeats:
         self.additional_song_buffer = 10
         self.track_info_dict = {}
 
-        self.get_authorization_token()  # oauth_token
+        # self.get_authorization_token()  # oauth_token
 
     def get_authorization_token(self):
-
+        # This function is not currently called
         if self.token is not None:
             if self.token.expires < datetime.now():
                 self.token.refresh()
@@ -118,6 +162,7 @@ class MyCardioBeats:
             return self.token.access_token
 
         print("Getting Spotify authorization token...")
+
         auth_url = 'https://accounts.spotify.com/authorize'
         token_url = 'https://accounts.spotify.com/api/token'
 
@@ -173,6 +218,8 @@ class MyCardioBeats:
         )
 
     def generate_random_string(self, length) -> str:
+        # This function is not currently called
+
         possible_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         new_string = "".join(random.choices(possible_chars, k=length))
 
@@ -193,62 +240,54 @@ class MyCardioBeats:
             "p": "peak"
         }
 
-        genre_dict = {
-            "pop": "pop",
-            "p": "pop",
-            "trap": "trap",
-            "t": "trap",
-            "90s": "90s",
-            "retro": "retro",
-            "re": "retro",
-            "latin": "latin",
-            "l": "latin",
-            "funk": "funk",
-            "f": "funk",
-            "rock": "rock",
-            "ro": "rock",
-            "hip_hop": "hip hop",
-            "hh": "hip hop",
-            "soul": "soul",
-            "s": "soul",
-            "dance": "dance",
-            "d": "dance",
-            "morning": "morning",
-            "m": "morning"
-        }
+        genres_string = " ".join([genre.title() for genre in self.genres])
+        # data = json.dumps(
+        #     {
+        #         "name": f"""
+        #             My {genres_string} Cardio Beats -
+        #             {intensity_dict.get(self.intensity, '')} - {date.today()}
+        #         """,
+        #         "description": "My Cardio Exercise Playlist",
+        #         "public": False
+        #     }
+        # )
 
-        data = json.dumps(
-            {
-                "name": f"""
-                    My {" ".join([genre.title() for genre in self.genres])} Cardio Beats - 
-                    {intensity_dict.get(self.intensity, '')} - {date.today()}
-                """,
-                "description": "My Cardio Exercise Playlist",
-                "public": False
-            }
+        # url = f"https://api.spotify.com/v1/users/{self.user_id}/playlists"
+        # print("Access Token: ", self.token.access_token)
+        # print("URL: ", url)
+
+        response = self.spotify_client.user_playlist_create(
+            self.user_id,
+            name=f"""
+                My {genres_string} Cardio Beats - 
+                {intensity_dict.get(self.intensity, '')} - {date.today()}
+            """,
+            public=False,
+            description=f"My {genres_string} Cardio Exercise Playlist",
         )
 
-        url = f"https://api.spotify.com/v1/users/{self.user_id}/playlists"
-        print("Access Token: ", self.token.access_token)
-        print("URL: ", url)
-        response = requests.post(
-            url,
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.token.access_token}",
-            }
-        )
+        # response = requests.post(
+        #     url,
+        #     data=data,
+        #     headers={
+        #         "Content-Type": "application/json",
+        #         "Authorization": f"Bearer {self.token.access_token}",
+        #     }
+        # )
 
-        if response.status_code != 201:
-            raise ResponseException(response.status_code)
+        # if response.status_code != 201:
+        #     raise ResponseException(response.status_code)
 
-        response_json = response.json()
-        playlist_id = response_json["id"]
-        Playlist.objects.create(
-            id=playlist_id,
-            name=playlist_name,
-        )
+        # response_json = response.json()
+        # playlist_id = response_json["id"]
+        # Playlist.objects.create(
+        #     id=playlist_id,
+        #     name=playlist_name,
+        # )
+
+        playlist_id = response.get("id", None)
+        if playlist_id is None:
+            raise Exception("Error occurred while creating playlist")
 
         return playlist_id
 
@@ -272,6 +311,9 @@ class MyCardioBeats:
             - Soul (s)
             - Dance (d)
             - Morning (m)
+            - Dancehall (da)
+            - Afrobeat (a)
+            - Soca (so)
         """
 
         print("Getting user exercise preferences...")
@@ -295,7 +337,8 @@ class MyCardioBeats:
         genres_input = input(
             "Enter your preferred genres. "
             "Select from the following: \n - pop (p)\n - trap (t)\n - 90s\n - retro (re)\n - latin (l)\n - funk (f)\n"
-            " - rock (ro)\n - hip hop (hh)\n - soul (s)\n - dance (d)\n - morning (m)\n"
+            " - rock (ro)\n - hip hop (hh)\n - soul (s)\n - dance (d)\n - morning (m)\n - dancehall (da)\n"
+            " - afrobeat (a)\n - soca (so)\n"
         )
         allowable_genres = [
             "pop",
@@ -319,6 +362,12 @@ class MyCardioBeats:
             "d",
             "morning",
             "m",
+            "da",
+            "dancehall",
+            "a",
+            "afrobeat",
+            "so",
+            "soca",
         ]
         pattern = ',|, +| +'
         genres = re.split(pattern, genres_input)
@@ -333,6 +382,7 @@ class MyCardioBeats:
                 "Enter your preferred genres. f"
                 "Select from the following: \n - pop (p)\n - trap (t)\n - 90s\n - retro (re)\n - latin (l)\n"
                 " - funk (f)\n - rock (ro)\n - hip hop (hh)\n - soul (s)\n - dance (d)\n - morning (m)\n"
+                " - dancehall (da)\n - afrobeat (a)\n - soca (so)\n"
             )
             genres = re.split(pattern, genres_input)
             unknown_genres = [
@@ -341,9 +391,10 @@ class MyCardioBeats:
                 if genre not in allowable_genres
             ]
 
-        return (intensity, int(session_length), genres)
+        return (intensity, int(session_length), [genre_dict.get(genre) for genre in genres])
 
     def get_users_top_songs(self):
+        # This function is not currently called
         """
         Gets user's top tracks and populates self.track_bpm_dict with track id and uris
         https://developer.spotify.com/documentation/web-api/reference/#/operations/get-users-top-artists-and-tracks
@@ -397,23 +448,28 @@ class MyCardioBeats:
         for genre in self.genres:
             playlist_id = cardio_playlists_ids.get(genre)
 
-            url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+            # url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
 
-            limit = 20
+            # limit = 20
 
-            response = requests.get(
-                url=url,
-                params={
-                    "limit": limit,
-                },
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.token.access_token}",
-                }
+            playlist_track_results = self.spotify_client.playlist_tracks(
+                playlist_id,
+                fields="items"
             )
 
-            response_json = response.json()
-            track_items = response_json.get("items")
+            # response = requests.get(
+            #     url=url,
+            #     params={
+            #         "limit": limit,
+            #     },
+            #     headers={
+            #         "Content-Type": "application/json",
+            #         "Authorization": f"Bearer {self.token.access_token}",
+            #     }
+            # )
+
+            # response_json = response.json()
+            track_items = playlist_track_results.get("items")
 
             if track_items is not None:
                 for item in track_items:
@@ -424,6 +480,7 @@ class MyCardioBeats:
                     }
 
     def get_song_recommendations(self):
+        # This function is not currently called
         """
         Get user's recommended tracks using top artists as seeds and populates self.track_bpm_dict with track id and uris
         https://developer.spotify.com/console/get-recommendations/
@@ -506,19 +563,21 @@ class MyCardioBeats:
 
         print("Getting track bpms")
 
-        url = f"https://api.spotify.com/v1/audio-analysis/{track_id}"
+        # url = f"https://api.spotify.com/v1/audio-analysis/{track_id}"
 
-        response = requests.get(
-            url=url,
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.token.access_token}",
-            }
-        )
+        # response = requests.get(
+        #     url=url,
+        #     headers={
+        #         "Accept": "application/json",
+        #         "Content-Type": "application/json",
+        #         "Authorization": f"Bearer {self.token.access_token}",
+        #     }
+        # )
 
-        response_json = response.json()
-        track = response_json.get("track")
+        # response_json = response.json()
+
+        track_results = self.spotify_client.audio_analysis(track_id)
+        track = track_results.get("track", None)
         if track is not None:
             return track["tempo"]
 
@@ -558,6 +617,19 @@ class MyCardioBeats:
             if resting_heartrate_bpm < track["bpm"] < max_desired_bpm
         ]
 
+        milliseconds_per_minute = 60000
+
+        print("Total num tracks retrieved: ", len(self.track_info_dict))
+        print("Total tracks time (min): ", sum(
+            [track["duration"] for track in self.track_info_dict.values()]
+        ) / milliseconds_per_minute
+        )
+        print("Total number of songs with required bpm: ", len(tracks))
+        print("Total tracks time (min): ", sum(
+            [track["duration"] for track in tracks]
+        ) / milliseconds_per_minute
+        )
+
         def track_bpm(track):
             return track["bpm"]
 
@@ -588,12 +660,11 @@ class MyCardioBeats:
                 total_tracks_duration_ms += track["duration"]
                 break
 
-        milliseconds_per_minute = 60_000
-
         print("Adding songs at desired cardio intensity to track list...")
         while (
-            total_tracks_duration_ms < self.session_length *
-                milliseconds_per_minute - 2 * self.avg_song_length_min
+            total_tracks_duration_ms < (
+                self.session_length - 2 * self.avg_song_length_min
+            ) * milliseconds_per_minute
         ):
             # num_songs_to_max_desired_bpm = 2
             # while max_desired_bpm - max_track_bpm / num_songs_to_max_desired_bpm > 20:
@@ -608,7 +679,6 @@ class MyCardioBeats:
                     # max_track_bpm = track["bpm"]
                     sorted_tracks.append(track["uri"])
                     total_tracks_duration_ms += track["duration"]
-                    break
 
             break
 
@@ -630,28 +700,33 @@ class MyCardioBeats:
         # create playlist
         playlist_id = self.create_playlist()
 
-        request_data = json.dumps({"uris": sorted_tracks})
+        # request_data = json.dumps({"uris": sorted_tracks})
 
         # add tracks to playlist
         print("Adding tracks to playlist...")
         if playlist_id is not None:
-            add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
 
-            add_tracks_response = requests.post(
-                add_tracks_url,
-                data=request_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.token.access_token}",
-                }
+            self.spotify_client.playlist_add_items(
+                playlist_id,
+                sorted_tracks
             )
+            # add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
 
-            if add_tracks_response.status_code != 201:
-                raise ResponseException(add_tracks_response.status_code)
+            # add_tracks_response = requests.post(
+            #     add_tracks_url,
+            #     data=request_data,
+            #     headers={
+            #         "Content-Type": "application/json",
+            #         "Authorization": f"Bearer {self.token.access_token}",
+            #     }
+            # )
+
+            # if add_tracks_response.status_code != 201:
+            #     raise ResponseException(add_tracks_response.status_code)
 
             print("All tracks have been successfully added to playlist!")
-            add_tracks_response_json = add_tracks_response.json()
-            return add_tracks_response_json
+            # add_tracks_response_json = add_tracks_response.json()
+            # return add_tracks_response_json
 
 
 if __name__ == '__main__':
